@@ -1,7 +1,91 @@
 ﻿@page "/"
+@using Microsoft.AspNetCore.SignalR.Client
 
-<PageTitle>Home</PageTitle>
+@rendermode InteractiveServer
 
-<h1>Hello, world!</h1>
+<PageTitle>Chat Room</PageTitle>
 
-Welcome to your new app.
+@if (!IsAuthenticate)
+{
+    <InputText @bind-Value="Username" Label="Kullanıcı adı"></InputText>
+    <button @onclick=SignIn>Giriş Yap</button>
+}
+else
+{
+    <Toasts class="p-3" Messages="messages" AutoHide="true" StackLength="3" Placement="ToastsPlacement.TopRight" />
+    <ul>
+        @foreach (var client in Clients)
+        {
+            <li>@client.Username</li>
+        }
+    </ul>
+}
+
+
+
+@code{
+    List<ToastMessage> messages = new List<ToastMessage>();
+
+    public string Username { get; set; } = String.Empty;
+
+    // Client giriş yapmış mı yapmamış mı kontrol ediliyor.. (Veritabanı bağlantısı yok, veriler InMemoryde tutuluyor. Sadece username bilgisi girip girmediği kontrol ediliyor..)
+    public bool IsAuthenticate { get; set; } = false;
+
+    private List<Client> Clients { get; set; } = new List<Client>();
+    class Client()
+    {
+        public string ConnectionId { get; set; }
+        public string Username { get; set; }
+    }
+
+    // SignalR hub'ına bağlantıyı sağlar..
+    private HubConnection hubConnection;
+
+    // Bileşen başlatıldığında yapılacaklar
+    protected override async Task OnInitializedAsync()
+    {
+        // SignalR hubına bağlantı oluşturur..
+        hubConnection = new HubConnectionBuilder()
+        .WithUrl("https://localhost:7038/chathub") // Bağlanılacak hub URLini belirler..
+        .Build();
+
+        // Sunucudan gelen bildirileri işler..
+
+        // Sisteme yeni bir kullanıcı dahil olduğunda tüm clientlara bildirecek.. Server tarafından tetikleniyor..
+        hubConnection.On<string>("clientJoined", async (username) =>
+        {
+            messages.Add(CreateToastMessage(ToastType.Info, $"{username} adlı kullanıcı sisteme giriş yaptı."));
+
+            await InvokeAsync(StateHasChanged); // UI güncellemesi için InvokeAsync metodu çağırılıyor..
+        });
+
+        // Sistemdeki clientların listesi güncellendiğinde (client giriş çıkışlarında) server tarafından tetiklenerek güncel liste alınacak..
+        hubConnection.On<List<Client>>("clients", async (clientList) =>
+        {
+            Clients = clientList;
+            await InvokeAsync(StateHasChanged); // UI güncellemesi..
+        });
+
+        await hubConnection.StartAsync(); // Hub bağlantısını başlatır..
+
+        await hubConnection.SendAsync("GetClientsAsync"); // Kullanıcı giriş yaptığında tüm clientların listesini çeker.. (Client serverı tetikliyor..)
+    }
+
+    // Login işlemi..
+    async Task SignIn()
+    {
+        // Serverdaki GetUsernameAsync methodu tetiklenerek kullanıcı girişi yapıldığı server tarafından clienttaki clientJoined methodu tetiklenerek caller haricindeki tüm clientlara bildiriliyor ve benzeri şekilde Clients listesi güncelleniyor..
+        await hubConnection.SendAsync("GetUsernameAsync", Username);
+        IsAuthenticate = true;
+        await InvokeAsync(StateHasChanged); // UI güncellemesi..
+    }
+
+    private ToastMessage CreateToastMessage(ToastType toastType, string message)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Kullanıcı Girişi",
+            HelpText = $"{DateTime.Now}",
+            Message = $"{message}",
+        };
+}
