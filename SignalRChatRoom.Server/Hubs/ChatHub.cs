@@ -26,5 +26,15 @@ namespace SignalRChatRoom.Server.Hubs
             // Sisteme dahil olan clientı kendisi de dahil olmak üzere tüm clientlara bildirir..
             await Clients.All.SendAsync("clients", ClientSource.Clients);
         }
+
+        // Caller bir clienta mesaj gönderecekse tetiklenir..
+        public async Task SendMessageAsync(string message, Client client)
+        {
+            // Caller bilgisi alınıyor..
+            Client senderClient = ClientSource.Clients.FirstOrDefault(c => c.ConnectionId == Context.ConnectionId);
+
+            // Clientta tanımlı receiveMessage fonksiyonunu tetikler...
+            await Clients.Client(client.ConnectionId).SendAsync("receiveMessage", message, client, senderClient);
+        }
     }
 }

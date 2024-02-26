@@ -7,36 +7,91 @@
 
 @if (!IsAuthenticate)
 {
-    <InputText @bind-Value="Username" Label="Kullanıcı adı"></InputText>
+    <InputText @bind-Value="CallerUsername" Label="Kullanıcı adı"></InputText>
     <button @onclick=SignIn>Giriş Yap</button>
 }
 else
 {
-    <Toasts class="p-3" Messages="messages" AutoHide="true" StackLength="3" Placement="ToastsPlacement.TopRight" />
-    <ul>
-        @foreach (var client in Clients)
-        {
-            <li>@client.Username</li>
-        }
-    </ul>
+    <Toasts class="p-3" Messages="NotificationMessages" AutoHide="true" StackLength="3" Placement="ToastsPlacement.TopRight" />
+
+    @* Sistemdeki clientlar listeleniyor.. *@
+    <div class="row">
+        <div class="col-4">
+            <div class="list-group" id="list-tab" role="tablist">
+                @foreach (var client in Clients)
+                {
+                    @* <a class="list-group-item list-group-item-action active" id="list-home-list" data-toggle="list" role="tab" aria-controls="home">@client.Username</a> *@
+                    <a class="list-group-item list-group-item-action @(client == selectedClient ? "active" : "")" id="list-@client.ConnectionId-list" data-toggle="list" role="tab" aria-controls="@client.Username" @onclick="@(() => SelectClient(client))">@client.Username</a>
+                }
+            </div>
+        </div>
+        <div class="col-8">
+            <div class="tab-content" id="nav-tabContent">
+                <div class="tab-pane fade show active" id="list-home" role="tabpanel" aria-labelledby="list-home-list">...</div>
+                <div class="tab-pane fade" id="list-profile" role="tabpanel" aria-labelledby="list-profile-list">...</div>
+                <div class="tab-pane fade" id="list-messages" role="tabpanel" aria-labelledby="list-messages-list">...</div>
+                <div class="tab-pane fade" id="list-settings" role="tabpanel" aria-labelledby="list-settings-list">...</div>
+            </div>
+        </div>
+    </div>
+
+    @* Callerın seçili clientlarla olan mesajları listeleniyor.. *@
+    <div class="container">
+        <div class="row">
+            <div class="col-md-8 offset-md-2">
+                <h1 class="text-center">Sohbet</h1>
+                <div class="messages">
+                    @for (int i = 0; i < Messages.Count; i++)
+                    {
+                        if (Messages[i].ReceiverClientUsername == Messages[i].SenderClientUsername)
+                        {
+                            <div class="message mine">
+                                <strong>Ben</strong>: @Messages[i].Message
+                            </div>
+                        }else
+                        {
+                            <div class="message theirs">
+                                <strong>@Messages[i].SenderClientUsername</strong>: @Messages[i].Message
+                            </div>
+                        }
+                    }
+                </div>
+                <div class="input-group">
+                    <input type="text" class="form-control" @bind-value="TextMessage" placeholder="Mesajınızı yazın...">
+                    <div class="input-group-append">
+                        <button class="btn btn-primary" @onclick=@(() => SendMessageAsync(TextMessage))>Gönder</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 }
 
 
+@code {
+    List<ToastMessage> NotificationMessages = new List<ToastMessage>();
 
-@code{
-    List<ToastMessage> messages = new List<ToastMessage>();
+    List<ClientMessage> Messages = new List<ClientMessage>(); // Clientla alakalı mesajları tutacak olan liste..
 
-    public string Username { get; set; } = String.Empty;
+    public string CallerUsername { get; set; } = String.Empty; // Kişinin login olurken girdiği username bilgisi..
+    public string TextMessage { get; set; } = String.Empty; // Gönderilecek mesaj
 
     // Client giriş yapmış mı yapmamış mı kontrol ediliyor.. (Veritabanı bağlantısı yok, veriler InMemoryde tutuluyor. Sadece username bilgisi girip girmediği kontrol ediliyor..)
     public bool IsAuthenticate { get; set; } = false;
 
-    private List<Client> Clients { get; set; } = new List<Client>();
+    private List<Client> Clients { get; set; } = new List<Client>(); // Sisteme giriş yapan tüm clientların bilgisini tutan liste..
     class Client()
     {
         public string ConnectionId { get; set; }
         public string Username { get; set; }
     }
+    class ClientMessage()
+    {
+        public string ReceiverClientUsername { get; set; }
+        public string SenderClientUsername { get; set; }
+        public string Message { get; set; }
+    }
+
 
     // SignalR hub'ına bağlantıyı sağlar..
     private HubConnection hubConnection;
@@ -54,7 +109,7 @@ else
         // Sisteme yeni bir kullanıcı dahil olduğunda tüm clientlara bildirecek.. Server tarafından tetikleniyor..
         hubConnection.On<string>("clientJoined", async (username) =>
         {
-            messages.Add(CreateToastMessage(ToastType.Info, $"{username} adlı kullanıcı sisteme giriş yaptı."));
+            NotificationMessages.Add(CreateToastMessage(ToastType.Info, $"{username} adlı kullanıcı sisteme giriş yaptı."));
 
             await InvokeAsync(StateHasChanged); // UI güncellemesi için InvokeAsync metodu çağırılıyor..
         });
@@ -63,6 +118,14 @@ else
         hubConnection.On<List<Client>>("clients", async (clientList) =>
         {
             Clients = clientList;
+            await InvokeAsync(StateHasChanged); // UI güncellemesi..
+        });
+
+        // Bir callerın sistemdeki herhangi bir clienta mesaj atma durumunda server tarafından tetiklenecek..
+        hubConnection.On<string, Client, Client>("receiveMessage", async (message, client, senderClient) =>
+        {
+            // Clienta gönderilen mesajları tutan listeye mesaj ekleniyor..
+            Messages.Add(new ClientMessage() { ReceiverClientUsername = client.Username, SenderClientUsername = senderClient.Username, Message = message });
             await InvokeAsync(StateHasChanged); // UI güncellemesi..
         });
 
@@ -75,9 +138,28 @@ else
     async Task SignIn()
     {
         // Serverdaki GetUsernameAsync methodu tetiklenerek kullanıcı girişi yapıldığı server tarafından clienttaki clientJoined methodu tetiklenerek caller haricindeki tüm clientlara bildiriliyor ve benzeri şekilde Clients listesi güncelleniyor..
-        await hubConnection.SendAsync("GetUsernameAsync", Username);
+        await hubConnection.SendAsync("GetUsernameAsync", CallerUsername);
         IsAuthenticate = true;
         await InvokeAsync(StateHasChanged); // UI güncellemesi..
+    }
+
+
+    private Client selectedClient = new Client();
+    private void SelectClient(Client client)
+    {
+        // Mesaj gönderilecek client bilgisi selectedClienta atanıyor..
+        selectedClient = client;
+    }
+
+    // Caller bir clienta ya da tüm clientlara mesaj gönderecekse serverı tetikler..
+    async Task SendMessageAsync(string message)
+    {
+        await hubConnection.SendAsync("SendMessageAsync", message, selectedClient);
+
+        // Mesajı gönderen clientta da göstermek için mesaj Messages listesine ekleniyor.. 
+        Messages.Add(new ClientMessage() { Message = message, ReceiverClientUsername = CallerUsername, SenderClientUsername = CallerUsername });
+        // Mesaj temizleniyor..
+        TextMessage = string.Empty;
     }
 
     private ToastMessage CreateToastMessage(ToastType toastType, string message)
