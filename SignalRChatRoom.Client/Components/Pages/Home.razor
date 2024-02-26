@@ -43,7 +43,8 @@ else
                 <div class="messages">
                     @for (int i = 0; i < Messages.Count; i++)
                     {
-                        if (Messages[i].ReceiverClientUsername == Messages[i].SenderClientUsername)
+                        @* if (Messages[i].ReceiverClientUsername == Messages[i].SenderClientUsername) *@
+                        if (Messages[i].IsSenderReceiver)
                         {
                             <div class="message mine">
                                 <strong>Ben</strong>: @Messages[i].Message
@@ -90,6 +91,7 @@ else
         public string ReceiverClientUsername { get; set; }
         public string SenderClientUsername { get; set; }
         public string Message { get; set; }
+        public bool IsSenderReceiver { get; set; } = false;
     }
 
 
@@ -157,7 +159,8 @@ else
         await hubConnection.SendAsync("SendMessageAsync", message, selectedClient);
 
         // Mesajı gönderen clientta da göstermek için mesaj Messages listesine ekleniyor.. 
-        Messages.Add(new ClientMessage() { Message = message, ReceiverClientUsername = CallerUsername, SenderClientUsername = CallerUsername });
+        Messages.Add(new ClientMessage() { Message = message, ReceiverClientUsername = selectedClient.Username, SenderClientUsername = CallerUsername, IsSenderReceiver = true });
+        StateHasChanged();
         // Mesaj temizleniyor..
         TextMessage = string.Empty;
     }
