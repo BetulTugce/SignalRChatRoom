@@ -41,18 +41,18 @@ else
             <div class="col-md-8 offset-md-2">
                 <h1 class="text-center">Sohbet</h1>
                 <div class="messages">
-                    @for (int i = 0; i < Messages.Count; i++)
+                    @for (int i = 0; i < SelectedUserMessages.Count; i++)
                     {
                         @* if (Messages[i].ReceiverClientUsername == Messages[i].SenderClientUsername) *@
-                        if (Messages[i].IsSenderReceiver)
+                        if (SelectedUserMessages[i].IsSenderReceiver)
                         {
                             <div class="message mine">
-                                <strong>Ben</strong>: @Messages[i].Message
+                                <strong>Ben</strong>: @SelectedUserMessages[i].Message
                             </div>
                         }else
                         {
                             <div class="message theirs">
-                                <strong>@Messages[i].SenderClientUsername</strong>: @Messages[i].Message
+                                <strong>@SelectedUserMessages[i].SenderClientUsername</strong>: @SelectedUserMessages[i].Message
                             </div>
                         }
                     }
@@ -128,6 +128,10 @@ else
         {
             // Clienta gönderilen mesajları tutan listeye mesaj ekleniyor..
             Messages.Add(new ClientMessage() { ReceiverClientUsername = client.Username, SenderClientUsername = senderClient.Username, Message = message });
+
+            // Seçilen clientın usernameine göre o clientla olan mesajlaşmaları filtreleyerek SelectedUserMessages listesine atar..
+            FilterUserMessages(selectedClient.Username);
+
             await InvokeAsync(StateHasChanged); // UI güncellemesi..
         });
 
@@ -145,22 +149,37 @@ else
         await InvokeAsync(StateHasChanged); // UI güncellemesi..
     }
 
+    List<ClientMessage> SelectedUserMessages = new List<ClientMessage>(); // Seçilen clientla ve callerla alakalı mesajları tutacak olan liste..
+
+    // Messsages listesinden parametrede gelen clientın attığı ve o usernamee atılan mesajları filtreler..
+    void FilterUserMessages(string receiverClientName)
+    {
+        SelectedUserMessages = Messages.Where(msg => msg.ReceiverClientUsername == receiverClientName || msg.SenderClientUsername == receiverClientName).ToList();
+    }
 
     private Client selectedClient = new Client();
     private void SelectClient(Client client)
     {
         // Mesaj gönderilecek client bilgisi selectedClienta atanıyor..
         selectedClient = client;
+
+        // Seçilen clientın usernameine göre o clientla olan mesajlaşmaları filtreleyerek SelectedUserMessages listesine atar..
+        FilterUserMessages(client.Username);
     }
 
     // Caller bir clienta ya da tüm clientlara mesaj gönderecekse serverı tetikler..
     async Task SendMessageAsync(string message)
     {
+        // Serverdaki SendMessageAsync methodu tetiklenerek seçilen clienta mesajın gönderilme işlemi gerçekleştiriliyor..
         await hubConnection.SendAsync("SendMessageAsync", message, selectedClient);
 
         // Mesajı gönderen clientta da göstermek için mesaj Messages listesine ekleniyor.. 
         Messages.Add(new ClientMessage() { Message = message, ReceiverClientUsername = selectedClient.Username, SenderClientUsername = CallerUsername, IsSenderReceiver = true });
+
+        // Seçilen clientın usernameine göre o clientla olan mesajlaşmaları filtreleyerek SelectedUserMessages listesine atar..
+        FilterUserMessages(selectedClient.Username);
         StateHasChanged();
+
         // Mesaj temizleniyor..
         TextMessage = string.Empty;
     }
