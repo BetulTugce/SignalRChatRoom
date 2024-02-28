@@ -5,6 +5,118 @@
 
 <PageTitle>Chat Room</PageTitle>
 
+<style>
+    main-container {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+    }
+
+    .container {
+        display: flex;
+    }
+
+    .users {
+        width: 200px;
+        background-color: #f2f2f2;
+        padding: 20px;
+        border: 1px solid #e0e0e0;
+        box-sizing: border-box;
+    }
+
+        .users h3 {
+            margin-top: 0;
+            padding: 10px;
+        }
+
+        .users ul {
+            list-style-type: none;
+            overflow-y: auto;
+            max-height: 400px;
+            padding: 0;
+        }
+
+        .users .user {
+            cursor: pointer;
+            padding: 10px;
+            margin-bottom: 5px;
+            background-color: #e0e0e0;
+        }
+
+            .users .user.active {
+                background-color: #ffff;
+            }
+
+    .conversation {
+        flex: 1;
+        padding: 20px;
+        border: 1px solid #e0e0e0;
+        box-sizing: border-box;
+    }
+
+        .conversation .header {
+            background-color: #e0e0e0;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+
+    .messages {
+        overflow-y: auto;
+        max-height: 400px;
+        min-height: 400px;
+    }
+
+    .message {
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 5px;
+        /* max-width: 70%; */
+        max-width:max-content;
+    }
+
+    .sent {
+        background-color: #DCF8C6;
+        align-self: flex-end;
+        margin-right: 0px !important;
+        margin-left: auto; /* flexbox alignment rule */
+    }
+
+    .received {
+        background-color: #ECE5DD;
+    }
+
+    .time {
+        font-size: 12px;
+        color: #666;
+    }
+
+    .input-area {
+        margin-top: 20px;
+    }
+
+        .input-area input {
+            width: calc(100% - 80px);
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px 0 0 5px;
+        }
+
+        .input-area button {
+            width: 70px;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: #fff;
+            border: none;
+            border-radius: 0 5px 5px 0;
+            cursor: pointer;
+            float: right;
+        }
+
+            .input-area button:hover {
+                background-color: #45a049;
+            }
+
+</style>
 @if (!IsAuthenticate)
 {
     <InputText @bind-Value="CallerUsername" Label="Kullanıcı adı"></InputText>
@@ -12,62 +124,50 @@
 }
 else
 {
-    <Toasts class="p-3" Messages="NotificationMessages" AutoHide="true" StackLength="3" Placement="ToastsPlacement.TopRight" />
+    <div class="main-container">
 
-    @* Sistemdeki clientlar listeleniyor.. *@
-    <div class="row">
-        <div class="col-4">
-            <div class="list-group" id="list-tab" role="tablist">
-                @foreach (var client in Clients)
+        <Toasts class="p-3" Messages="NotificationMessages" AutoHide="true" StackLength="3" Placement="ToastsPlacement.TopRight" />
+
+        <div class="container">
+
+            @* Sistemdeki clientlar listeleniyor.. *@
+            <div class="users">
+                <h3>Kullanıcılar</h3>
+                <ul>
+                    @foreach (var client in Clients)
+                    {
+                        <li class="user @(client == selectedClient ? "active" : "")" @onclick="@(() => SelectClient(client))">@client.Username</li>
+                    }
+                </ul>
+            </div>
+
+            @* Callerın seçili clientlarla olan mesajları listeleniyor.. *@
+            <div class="conversation">
+                @if (selectedClient.Username != null)
                 {
-                    @* <a class="list-group-item list-group-item-action active" id="list-home-list" data-toggle="list" role="tab" aria-controls="home">@client.Username</a> *@
-                    <a class="list-group-item list-group-item-action @(client == selectedClient ? "active" : "")" id="list-@client.ConnectionId-list" data-toggle="list" role="tab" aria-controls="@client.Username" @onclick="@(() => SelectClient(client))">@client.Username</a>
+                    <div class="header">
+                        <h3>@selectedClient.Username</h3>
+                    </div>
                 }
-            </div>
-        </div>
-        <div class="col-8">
-            <div class="tab-content" id="nav-tabContent">
-                <div class="tab-pane fade show active" id="list-home" role="tabpanel" aria-labelledby="list-home-list">...</div>
-                <div class="tab-pane fade" id="list-profile" role="tabpanel" aria-labelledby="list-profile-list">...</div>
-                <div class="tab-pane fade" id="list-messages" role="tabpanel" aria-labelledby="list-messages-list">...</div>
-                <div class="tab-pane fade" id="list-settings" role="tabpanel" aria-labelledby="list-settings-list">...</div>
-            </div>
-        </div>
-    </div>
-
-    @* Callerın seçili clientlarla olan mesajları listeleniyor.. *@
-    <div class="container">
-        <div class="row">
-            <div class="col-md-8 offset-md-2">
-                <h1 class="text-center">Sohbet</h1>
                 <div class="messages">
                     @for (int i = 0; i < SelectedUserMessages.Count; i++)
                     {
-                        @* if (Messages[i].ReceiverClientUsername == Messages[i].SenderClientUsername) *@
-                        if (SelectedUserMessages[i].IsSenderReceiver)
-                        {
-                            <div class="message mine">
-                                <strong>Ben</strong>: @SelectedUserMessages[i].Message
-                            </div>
-                        }else
-                        {
-                            <div class="message theirs">
-                                <strong>@SelectedUserMessages[i].SenderClientUsername</strong>: @SelectedUserMessages[i].Message
-                            </div>
-                        }
+                        <div class="message @(SelectedUserMessages[i].IsSenderReceiver ? "sent" : "received")">
+                            <p>@SelectedUserMessages[i].Message</p>
+                            @* <span class="time">12:00</span> *@
+                        </div>
                     }
                 </div>
-                <div class="input-group">
-                    <input type="text" class="form-control" @bind-value="TextMessage" placeholder="Mesajınızı yazın...">
-                    <div class="input-group-append">
-                        <button class="btn btn-primary" @onclick=@(() => SendMessageAsync(TextMessage))>Gönder</button>
-                    </div>
+                <div class="input-area">
+                    <input @onkeyup="@(e => KeyHandler(e))" type="text" @bind-value="TextMessage" placeholder="Mesajınızı buraya yazın..">
+                    <button @onclick=@(() => SendMessageAsync(TextMessage))>Gönder</button>
                 </div>
             </div>
         </div>
     </div>
-}
 
+    
+}
 
 @code {
     List<ToastMessage> NotificationMessages = new List<ToastMessage>();
@@ -170,18 +270,31 @@ else
     // Caller bir clienta ya da tüm clientlara mesaj gönderecekse serverı tetikler..
     async Task SendMessageAsync(string message)
     {
-        // Serverdaki SendMessageAsync methodu tetiklenerek seçilen clienta mesajın gönderilme işlemi gerçekleştiriliyor..
-        await hubConnection.SendAsync("SendMessageAsync", message, selectedClient);
+        // Mesaj yazmadan butona tıklanırsa kodlar çalışmayacak..
+        if (!string.IsNullOrEmpty(message))
+        {
+            // Serverdaki SendMessageAsync methodu tetiklenerek seçilen clienta mesajın gönderilme işlemi gerçekleştiriliyor..
+            await hubConnection.SendAsync("SendMessageAsync", message, selectedClient);
 
-        // Mesajı gönderen clientta da göstermek için mesaj Messages listesine ekleniyor.. 
-        Messages.Add(new ClientMessage() { Message = message, ReceiverClientUsername = selectedClient.Username, SenderClientUsername = CallerUsername, IsSenderReceiver = true });
+            // Mesajı gönderen clientta da göstermek için mesaj Messages listesine ekleniyor..
+            Messages.Add(new ClientMessage() { Message = message, ReceiverClientUsername = selectedClient.Username, SenderClientUsername = CallerUsername, IsSenderReceiver = true });
 
-        // Seçilen clientın usernameine göre o clientla olan mesajlaşmaları filtreleyerek SelectedUserMessages listesine atar..
-        FilterUserMessages(selectedClient.Username);
-        StateHasChanged();
+            // Seçilen clientın usernameine göre o clientla olan mesajlaşmaları filtreleyerek SelectedUserMessages listesine atar..
+            FilterUserMessages(selectedClient.Username);
+            StateHasChanged();
 
-        // Mesaj temizleniyor..
-        TextMessage = string.Empty;
+            // Mesaj temizleniyor..
+            TextMessage = string.Empty;
+        }
+    }
+
+    // Mesaj yazılan inputta Entera basılırsa SendMessageAsync fonksiyonunu tetikler..
+    private async Task KeyHandler(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SendMessageAsync(TextMessage);
+        }
     }
 
     private ToastMessage CreateToastMessage(ToastType toastType, string message)
