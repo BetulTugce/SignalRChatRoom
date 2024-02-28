@@ -6,14 +6,14 @@
 <PageTitle>Chat Room</PageTitle>
 
 <style>
-    main-container {
+    /* main-container {
         font-family: Arial, sans-serif;
         margin: 0;
         padding: 0;
-    }
+    } */
 
     .container {
-        display: flex;
+        display: inline-flex;
     }
 
     .users {
@@ -32,7 +32,7 @@
         .users ul {
             list-style-type: none;
             overflow-y: auto;
-            max-height: 400px;
+            max-height: 330px;
             padding: 0;
         }
 
@@ -95,6 +95,14 @@
         color: #666;
     }
 
+    button, input, optgroup, select, textarea {
+        margin: 0;
+        font-family: inherit;
+        font-size: inherit;
+        line-height: inherit;
+        max-width: -webkit-fill-available;
+    }
+
     .input-area {
         margin-top: 20px;
     }
@@ -121,6 +129,12 @@
                 background-color: #45a049;
             }
 
+    .addGroup {
+        margin-top: 10px;
+        background-color: #e0e0e0;
+        border: none;
+        border-radius: 0 5px 5px 0;
+    }
 </style>
 @if (!IsAuthenticate)
 {
@@ -129,15 +143,44 @@
 }
 else
 {
-    <div class="main-container">
+    @* <div class="main-container"> *@
 
         <Toasts class="p-3" Messages="NotificationMessages" AutoHide="true" StackLength="3" Placement="ToastsPlacement.TopRight" />
 
+        
         <div class="container">
+
+            @* Sistemdeki odalar/gruplar listeleniyor.. *@
+            <div class="users">
+                <div>
+                    <input type="text" @bind-value="GroupNameText" placeholder="Grup Adı">
+                    <button class="addGroup" @onclick=@(() => AddGroup(GroupNameText))>Grup Ekle</button>
+                </div>
+                <h3>Odalar</h3>
+                <ul>
+                    @foreach (var group in Groups)
+                    {
+                        <li class="user @(group == selectedGroup ? "active" : "")" @onclick="@(() => SelectGroup(group))">@group.GroupName</li>
+                    }
+                </ul>
+            </div>
+            @* Seçili oda/gruba dahil olan clientlar listeleniyor.. *@
+            <div class="users">
+                @if (!string.IsNullOrEmpty(selectedGroup.GroupName))
+                {
+                    <h3>@selectedGroup.GroupName Üyeleri </h3>
+                    <ul>
+                        @foreach (var client in ClientsOfGroups)
+                        {
+                            <li class="user">@client.Username</li>
+                        }
+                    </ul>
+                }
+            </div>
 
             @* Sistemdeki clientlar listeleniyor.. *@
             <div class="users">
-                <h3>Kullanıcılar</h3>
+                <h3>Tüm Kullanıcılar</h3>
                 <ul>
                     @foreach (var client in Clients)
                     {
@@ -169,9 +212,7 @@ else
                 </div>
             </div>
         </div>
-    </div>
-
-    
+    @* </div> *@
 }
 
 @code {
@@ -181,10 +222,12 @@ else
 
     public string CallerUsername { get; set; } = String.Empty; // Kişinin login olurken girdiği username bilgisi..
     public string TextMessage { get; set; } = String.Empty; // Gönderilecek mesaj
+    public string GroupNameText { get; set; } = String.Empty; // Gönderilecek mesaj
 
     // Client giriş yapmış mı yapmamış mı kontrol ediliyor.. (Veritabanı bağlantısı yok, veriler InMemoryde tutuluyor. Sadece username bilgisi girip girmediği kontrol ediliyor..)
     public bool IsAuthenticate { get; set; } = false;
 
+    private List<Client> ClientsOfGroups { get; set; } = new List<Client>(); // Belirli bir gruptaki clientları tutan liste..
     private List<Client> Clients { get; set; } = new List<Client>(); // Sisteme giriş yapan tüm clientların bilgisini tutan liste..
     class Client()
     {
@@ -199,6 +242,12 @@ else
         public bool IsSenderReceiver { get; set; } = false;
     }
 
+    private List<Group> Groups { get; set; } = new List<Group>(); // Sistemde oluşturulan odaların bilgisini tutan liste..
+    class Group()
+    {
+        public string GroupName { get; set; }
+        public List<Client> Clients { get; } = new List<Client>();
+    }
 
     // SignalR hub'ına bağlantıyı sağlar..
     private HubConnection hubConnection;
@@ -225,6 +274,28 @@ else
         hubConnection.On<List<Client>>("clients", async (clientList) =>
         {
             Clients = clientList;
+            await InvokeAsync(StateHasChanged); // UI güncellemesi..
+        });
+        
+        // Sistemdeki bir gruba ait clientların listesi güncellendiğinde (client giriş çıkışlarında) server tarafından tetiklenerek güncel liste alınacak..
+        hubConnection.On<List<Client>>("clientsOfGroup", async (clientList) =>
+        {
+            ClientsOfGroups = clientList;
+            await InvokeAsync(StateHasChanged); // UI güncellemesi..
+        });
+
+        // Sisteme yeni bir oda/grup eklendiğinde tüm clientlara bildirecek.. Server tarafından tetikleniyor..
+        hubConnection.On<string>("groupAdded", async (groupName) =>
+        {
+            NotificationMessages.Add(CreateToastMessage(ToastType.Info, $"{groupName} adında yeni bir oda oluşturuldu."));
+
+            await InvokeAsync(StateHasChanged); // UI güncellemesi için InvokeAsync metodu çağırılıyor..
+        });
+
+        // Sistemdeki grupların/odaların listesi güncellendiğinde server tarafından tetiklenerek güncel liste alınacak..
+        hubConnection.On<List<Group>>("groups", async (groupList) =>
+        {
+            Groups = groupList;
             await InvokeAsync(StateHasChanged); // UI güncellemesi..
         });
 
@@ -272,6 +343,19 @@ else
         FilterUserMessages(client.Username);
     }
 
+    private Group selectedGroup = new Group();
+    private async Task SelectGroup(Group group)
+    {
+        // Mesaj gönderilecek grup bilgisi selectedGroupa atanıyor..
+        selectedGroup = group;
+        await AddClientToGroup(selectedGroup.GroupName);
+
+        await GetClientsOfGroup(selectedGroup.GroupName);
+
+        // Seçilen grubun GroupNameine göre o grupla olan mesajlaşmaları filtreleyerek SelectedUserMessages listesine atar..
+        FilterUserMessages(group.GroupName);
+    }
+
     // Caller bir clienta ya da tüm clientlara mesaj gönderecekse serverı tetikler..
     async Task SendMessageAsync(string message)
     {
@@ -291,6 +375,34 @@ else
             // Mesaj temizleniyor..
             TextMessage = string.Empty;
         }
+    }
+
+    // Caller bir oda oluştururken tetiklenir..
+    async Task AddGroup(string groupNameText)
+    {
+        // Grup adı yazmadan butona tıklanırsa kodlar çalışmayacak..
+        if (!string.IsNullOrEmpty(groupNameText))
+        {
+            // Serverdaki AddGroupAsync methodu tetiklenerek grup oluşturma işlemi gerçekleştiriliyor..
+            await hubConnection.SendAsync("AddGroupAsync", groupNameText);
+
+            // Grup oluşturma inputu temizleniyor..
+            groupNameText = string.Empty;
+        }
+    }
+
+    // Caller bir odaya girerken tetiklenir..
+    async Task AddClientToGroup(string groupName)
+    {
+        // Serverdaki AddClientToGroupAsync methodu tetiklenerek seçilen gruba callerın dahil olması sağlanıyor..
+        await hubConnection.SendAsync("AddClientToGroupAsync", groupName);
+    }
+    
+    // Tetiklendiğinde ilgili gruba ait tüm clientların listesini döndürür....
+    async Task GetClientsOfGroup(string groupName)
+    {
+        // Serverdaki GetClientsOfGroupAsync methodu tetiklenerek seçilen gruba subscribe olmuş tüm clientların listesini döndürür ve server tarafından clienttaki clients methodu tetiklenir..
+        await hubConnection.SendAsync("GetClientsOfGroupAsync", groupName);
     }
 
     // Mesaj yazılan inputta Entera basılırsa SendMessageAsync fonksiyonunu tetikler..
