@@ -47,6 +47,11 @@
                 background-color: #ffff;
             }
 
+    .user.disabled {
+        pointer-events: none; /* Tıklanabilirliği devre dışı bırakır */
+        opacity: 0.5; /* Devre dışı bırakılmış gibi bir görünüm sağlar */
+    }
+
     .conversation {
         flex: 1;
         padding: 20px;
@@ -136,7 +141,7 @@ else
                 <ul>
                     @foreach (var client in Clients)
                     {
-                        <li class="user @(client == selectedClient ? "active" : "")" @onclick="@(() => SelectClient(client))">@client.Username</li>
+                        <li class="user @(client == selectedClient ? "active" : "") @(client.Username.Equals(CallerUsername) ? "disabled" : "")" @onclick="@(() => SelectClient(client))"  >@client.Username</li>
                     }
                 </ul>
             </div>
