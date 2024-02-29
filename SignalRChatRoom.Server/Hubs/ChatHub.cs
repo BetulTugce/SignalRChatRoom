@@ -126,7 +126,7 @@ namespace SignalRChatRoom.Server.Hubs
             Group group = GroupSource.Groups.FirstOrDefault(g => g.GroupName.Equals(groupName));
 
             //await Clients.Caller.SendAsync("clientsOfGroup", group.Clients);
-            await Clients.Groups(groupName).SendAsync("clientsOfGroup", group.Clients);
+            await Clients.Groups(groupName).SendAsync("clientsOfGroup", group.Clients, group.GroupName);
         }
 
         // İlgili gruba mesajı gönderir..
@@ -136,6 +136,43 @@ namespace SignalRChatRoom.Server.Hubs
             //receiveMessage fonk.. 4 değer bekliyor.. 3. dönüş değeri bir Client beklemekte, grup mesajlaşmalarında bir clienta gönderilmediği için bu değer null olarak döndürülüyor..
             //4. dönüş değeri ise string beklemekte, bu da karşılıklı mesajlaşma durumunda null döndürülüyor..
             await Clients.Groups(groupName).SendAsync("receiveMessage", message, ClientSource.Clients.FirstOrDefault(c => c.ConnectionId == Context.ConnectionId), null, groupName);
+        }
+
+        //// Sisteme bir bağlantı gerçekleştiği zaman bu fonksiyon tetiklenecek..
+        //public override async Task OnConnectedAsync()
+        //{
+        //    await Clients.All.SendAsync("clientJoined", Context.ConnectionId);
+        //}
+
+        // Sistemden varolan bir bağlantı koptuğu zaman bu fonksiyon tetiklenecek..
+        public override async Task OnDisconnectedAsync(Exception? exception)
+        {
+            Client client = ClientSource.Clients.First(c => c.ConnectionId == Context.ConnectionId);
+            await Clients.All.SendAsync("clientLeaved", client != null ? client.Username : null);
+
+            // Callerı (Sisteme dahil olan kullanıcıyı) mevcuttaki tüm clientların tutulduğu listeden siler..
+            ClientSource.Clients.Remove(client);
+
+            // Kullanıcının çıkarıldığı güncel listeyi tüm clientlara bildirir..
+            await GetClientsAsync();
+
+            // Client subscribe olduğu gruplardan siliniyor.. 
+            foreach (var group in GroupSource.Groups)
+            {
+                // Caller ilgili groupa subscribe mı kontrol ediliyor..
+                var result = group.Clients.Any(c => c.ConnectionId == Context.ConnectionId);
+                if (result) // İlgili gruba dahilse..
+                {
+                    // Group nesnesinde tutulan client listesinden caller client siliniyor..
+                    group.Clients.Remove(client);
+
+                    // İlgili client (caller) gruptan siliniyor..
+                    await Groups.RemoveFromGroupAsync(Context.ConnectionId, group.GroupName);
+
+                    // İlgili gruba ait tüm clientların listesini döndürür..
+                    await GetClientsOfGroupAsync(group.GroupName);
+                }
+            }
         }
     }
 }

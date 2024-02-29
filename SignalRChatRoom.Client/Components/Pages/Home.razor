@@ -1,5 +1,6 @@
 ﻿@page "/"
 @using Microsoft.AspNetCore.SignalR.Client
+@implements IAsyncDisposable
 
 @rendermode InteractiveServer
 
@@ -282,6 +283,14 @@ else
             await InvokeAsync(StateHasChanged); // UI güncellemesi için InvokeAsync metodu çağırılıyor..
         });
 
+        // Sistemdeki bir kullanıcı bağlantıyı kopardığı zaman tetiklenecek.. Server tarafından tetikleniyor..
+        hubConnection.On<string>("clientLeaved", async (username) =>
+        {
+            NotificationMessages.Add(CreateToastMessage(ToastType.Info, $"{username} adlı kullanıcının bağlantısı koptu."));
+
+            await InvokeAsync(StateHasChanged); // UI güncellemesi için InvokeAsync metodu çağırılıyor..
+        });
+
         // Sistemdeki clientların listesi güncellendiğinde (client giriş çıkışlarında) server tarafından tetiklenerek güncel liste alınacak..
         hubConnection.On<List<Client>>("clients", async (clientList) =>
         {
@@ -290,10 +299,16 @@ else
         });
 
         // Sistemdeki bir gruba ait clientların listesi güncellendiğinde (client giriş çıkışlarında) server tarafından tetiklenerek güncel liste alınacak..
-        hubConnection.On<List<Client>>("clientsOfGroup", async (clientList) =>
+        hubConnection.On<List<Client>, string>("clientsOfGroup", async (clientList, groupName) =>
         {
-            ClientsOfGroups = clientList;
-            await InvokeAsync(StateHasChanged); // UI güncellemesi..
+            // Client çıkışı olduğu zaman clientı subscribe olduğu tüm gruplardan çıkarırken hepsinin listesi güncellenerek clientlara iletiliyor..
+            // Dolayısıyla clientın seçili grubu başkasıyken son grup hangisiyse onun client listesi görünebiliyor..
+            // Bu sebepten ötürü clientın seçtiği grup parametrede gelen gruba eşit olduğunda liste güncelleniyor..
+            if (selectedGroup.GroupName == groupName)
+            {
+                ClientsOfGroups = clientList;
+                await InvokeAsync(StateHasChanged); // UI güncellemesi..
+            }
         });
 
         // Sisteme yeni bir oda/grup eklendiğinde tüm clientlara bildirecek.. Server tarafından tetikleniyor..
@@ -463,6 +478,17 @@ else
         if (e.Key == "Enter")
         {
             await SendMessageAsync(TextMessage, selectedGroup.GroupName);
+        }
+    }
+
+    // hubConnection nesnesinin kullanımı sona erdiğinde temizleniyor..
+    public async ValueTask DisposeAsync()
+    {
+        // hubConnection nesnesi null değilse (yani tanımlanmışsa)
+        if (hubConnection is not null)
+        {
+            // hubConnection nesnesini temizleme işlemi yapılıyor ve bağlantı kaynakları serbest bırakılıyor..
+            await hubConnection.DisposeAsync();
         }
     }
 
