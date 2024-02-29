@@ -90,7 +90,7 @@
         background-color: #ECE5DD;
     }
 
-    .time {
+    .time, .sender {
         font-size: 12px;
         color: #666;
     }
@@ -207,8 +207,12 @@ else
                     @for (int i = 0; i < SelectedUserMessages.Count; i++)
                     {
                         <div class="message @(SelectedUserMessages[i].IsSenderReceiver ? "sent" : "received")">
+                            @if (SelectedUserMessages[i].IsGroupMessage && !SelectedUserMessages[i].IsSenderReceiver)
+                            {
+                                <span class="sender">Gönderen : @SelectedUserMessages[i].SenderClientUsername</span>
+                            }
                             <p>@SelectedUserMessages[i].Message</p>
-                            @* <span class="time">12:00</span> *@
+                            <span class="time">@SelectedUserMessages[i].CreatedDate.ToShortTimeString()</span>
                         </div>
                     }
                 </div>
@@ -247,6 +251,7 @@ else
         public string Message { get; set; }
         public bool IsGroupMessage { get; set; } = false;
         public bool IsSenderReceiver { get; set; } = false;
+        public DateTime CreatedDate { get; set; } = DateTime.Now;
     }
 
     private List<Group> Groups { get; set; } = new List<Group>(); // Sistemde oluşturulan odaların bilgisini tutan liste..
