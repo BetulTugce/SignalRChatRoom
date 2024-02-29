@@ -139,6 +139,8 @@
 </style>
 @if (!IsAuthenticate)
 {
+    <Toasts class="p-3" Messages="AuthenticationMessages" AutoHide="true" StackLength="3" Placement="ToastsPlacement.TopRight" />
+
     <InputText @bind-Value="CallerUsername" Label="Kullanıcı adı"></InputText>
     <button @onclick=SignIn>Giriş Yap</button>
 }
@@ -173,7 +175,7 @@ else
                     <ul>
                         @foreach (var client in ClientsOfGroups)
                         {
-                            <li class="user">@client.Username</li>
+                            <li class="user @(client.Username.Equals(CallerUsername) ? "disabled" : "")">@client.Username</li>
                         }
                     </ul>
                 }
@@ -355,13 +357,41 @@ else
         await hubConnection.SendAsync("GetClientsAsync"); // Kullanıcı giriş yaptığında tüm clientların listesini çeker.. (Client serverı tetikliyor..)
     }
 
+    // Girilen username varolan clientlardan biri tarafından kullanılıyorsa false, kullanılmıyorsa true döndürecek..
+    public async Task<bool> CheckUsernameAsync(string username)
+    {
+        Client client = Clients.FirstOrDefault(c => c.Username == username);
+        return (client != null) ? false : true;
+    }
+
+    List<ToastMessage> AuthenticationMessages = new List<ToastMessage>();
+
     // Login işlemi..
     async Task SignIn()
     {
-        // Serverdaki GetUsernameAsync methodu tetiklenerek kullanıcı girişi yapıldığı server tarafından clienttaki clientJoined methodu tetiklenerek caller haricindeki tüm clientlara bildiriliyor ve benzeri şekilde Clients listesi güncelleniyor..
-        await hubConnection.SendAsync("GetUsernameAsync", CallerUsername);
-        IsAuthenticate = true;
-        await InvokeAsync(StateHasChanged); // UI güncellemesi..
+        if (!string.IsNullOrEmpty(CallerUsername))
+        {
+            bool result = await CheckUsernameAsync(CallerUsername);
+            if (result) // Giriş başarılı
+            {
+                // Serverdaki GetUsernameAsync methodu tetiklenerek kullanıcı girişi yapıldığı server tarafından clienttaki clientJoined methodu tetiklenerek caller haricindeki tüm clientlara bildiriliyor ve benzeri şekilde Clients listesi güncelleniyor..
+                await hubConnection.SendAsync("GetUsernameAsync", CallerUsername);
+                IsAuthenticate = true;
+                await InvokeAsync(StateHasChanged); // UI güncellemesi..
+            }
+            else
+            {
+                // Usernamein kullanımda olduğuna dair uyarı verilecek..
+                AuthenticationMessages.Add(new ToastMessage()
+                {
+                        Type = ToastType.Warning,
+                        Title = "Giriş Başarısız",
+                        HelpText = $"{DateTime.Now}",
+                        Message = $"Kullanıcı adı zaten alınmış!",
+                });
+            }
+        }
+        
     }
 
     List<ClientMessage> SelectedUserMessages = new List<ClientMessage>(); // Seçilen clientla ve callerla alakalı mesajları tutacak olan liste..
