@@ -64,7 +64,7 @@ namespace SignalRChatRoom.Server.Hubs
 
         public async Task GetGroupsAsync()
         {
-            // Sisteme eklenen oda/grup oluşturan client dahil olmak üzere tüm clientlara bildirir..
+            // Sisteme eklenen oda/grup oluşturan client dahil olmak üzere tüm clientlara bildirir.. Güncel grup listesini tüm clientlara bildirir..
             await Clients.All.SendAsync("groups", GroupSource.Groups);
         }
 
@@ -88,6 +88,9 @@ namespace SignalRChatRoom.Server.Hubs
 
                     // İlgili client (caller) gruba dahil ediliyor..
                     await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
+
+                    // İlgili gruba ait tüm clientların listesini döndürür..
+                    await GetClientsOfGroupAsync(groupName);
                 }
             }
         }
@@ -110,6 +113,9 @@ namespace SignalRChatRoom.Server.Hubs
 
                 // İlgili client (caller) gruba dahil ediliyor..
                 await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
+
+                // İlgili gruba ait tüm clientların listesini döndürür..
+                await GetClientsOfGroupAsync(groupName);
             }
             
         }
@@ -119,7 +125,8 @@ namespace SignalRChatRoom.Server.Hubs
         {
             Group group = GroupSource.Groups.FirstOrDefault(g => g.GroupName.Equals(groupName));
 
-            await Clients.Caller.SendAsync("clientsOfGroup", group.Clients);
+            //await Clients.Caller.SendAsync("clientsOfGroup", group.Clients);
+            await Clients.Groups(groupName).SendAsync("clientsOfGroup", group.Clients);
         }
 
         // İlgili gruba mesajı gönderir..
