@@ -36,8 +36,10 @@ namespace SignalRChatRoom.Server.Hubs
             // Caller bilgisi alınıyor..
             Client senderClient = ClientSource.Clients.FirstOrDefault(c => c.ConnectionId == Context.ConnectionId);
 
-            // Clientta tanımlı receiveMessage fonksiyonunu tetikler...
-            await Clients.Client(client.ConnectionId).SendAsync("receiveMessage", message, client, senderClient);
+            // Clientta tanımlı receiveMessage fonksiyonunu tetikler.Mesaj, senderClient ve receiverClient değerleri döndürülür..receiveMessage fonk..4 değer bekliyor..
+            // 3.dönüş değeri bir Client beklemekte, grup mesajlaşmalarında bir clienta gönderilmediği için bu değer null olarak döndürülüyor..
+            // 4.dönüş değeri ise string beklemekte, bu da karşılıklı mesajlaşma durumunda null döndürülüyor..
+            await Clients.Client(client.ConnectionId).SendAsync("receiveMessage", message, senderClient, client, null);
         }
 
         // Grup oluşturma işlemini herhangi bir client yapacağı için ilk etapta gruba, grubu oluşturan client (caller) subscribe edilir..
@@ -118,6 +120,15 @@ namespace SignalRChatRoom.Server.Hubs
             Group group = GroupSource.Groups.FirstOrDefault(g => g.GroupName.Equals(groupName));
 
             await Clients.Caller.SendAsync("clientsOfGroup", group.Clients);
+        }
+
+        // İlgili gruba mesajı gönderir..
+        public async Task SendMessageToGroupAsync(string groupName, string message)
+        {
+            //Clienttaki receiveMessage fonk. tetiklenir. Mesaj, senderClient ve groupName değerleri döndürülür.. 
+            //receiveMessage fonk.. 4 değer bekliyor.. 3. dönüş değeri bir Client beklemekte, grup mesajlaşmalarında bir clienta gönderilmediği için bu değer null olarak döndürülüyor..
+            //4. dönüş değeri ise string beklemekte, bu da karşılıklı mesajlaşma durumunda null döndürülüyor..
+            await Clients.Groups(groupName).SendAsync("receiveMessage", message, ClientSource.Clients.FirstOrDefault(c => c.ConnectionId == Context.ConnectionId), null, groupName);
         }
     }
 }

@@ -197,6 +197,12 @@ else
                         <h3>@selectedClient.Username</h3>
                     </div>
                 }
+                else if (selectedGroup.GroupName != null)
+                {
+                    <div class="header">
+                        <h3>@selectedGroup.GroupName</h3>
+                    </div>
+                }
                 <div class="messages">
                     @for (int i = 0; i < SelectedUserMessages.Count; i++)
                     {
@@ -208,7 +214,7 @@ else
                 </div>
                 <div class="input-area">
                     <input @onkeyup="@(e => KeyHandler(e))" type="text" @bind-value="TextMessage" placeholder="Mesajınızı buraya yazın..">
-                    <button @onclick=@(() => SendMessageAsync(TextMessage))>Gönder</button>
+                    <button @onclick=@(() => SendMessageAsync(TextMessage, selectedGroup.GroupName))>Gönder</button>
                 </div>
             </div>
         </div>
@@ -236,9 +242,10 @@ else
     }
     class ClientMessage()
     {
-        public string ReceiverClientUsername { get; set; }
+        public string ReceiverClientUsernameOrGroupName { get; set; }
         public string SenderClientUsername { get; set; }
         public string Message { get; set; }
+        public bool IsGroupMessage { get; set; } = false;
         public bool IsSenderReceiver { get; set; } = false;
     }
 
@@ -276,7 +283,7 @@ else
             Clients = clientList;
             await InvokeAsync(StateHasChanged); // UI güncellemesi..
         });
-        
+
         // Sistemdeki bir gruba ait clientların listesi güncellendiğinde (client giriş çıkışlarında) server tarafından tetiklenerek güncel liste alınacak..
         hubConnection.On<List<Client>>("clientsOfGroup", async (clientList) =>
         {
@@ -300,15 +307,27 @@ else
         });
 
         // Bir callerın sistemdeki herhangi bir clienta mesaj atma durumunda server tarafından tetiklenecek..
-        hubConnection.On<string, Client, Client>("receiveMessage", async (message, client, senderClient) =>
+        hubConnection.On<string, Client, Client?, string?>("receiveMessage", async (message, senderClient, client, groupName ) =>
         {
-            // Clienta gönderilen mesajları tutan listeye mesaj ekleniyor..
-            Messages.Add(new ClientMessage() { ReceiverClientUsername = client.Username, SenderClientUsername = senderClient.Username, Message = message });
+            // Bir clientla mesajlaşılıyorsa..
+            if (client != null)
+            {
+                // Clienta gönderilen mesajları tutan listeye mesaj ekleniyor..
+                Messages.Add(new ClientMessage() { ReceiverClientUsernameOrGroupName = client.Username, SenderClientUsername = senderClient.Username, Message = message });
 
-            // Seçilen clientın usernameine göre o clientla olan mesajlaşmaları filtreleyerek SelectedUserMessages listesine atar..
-            FilterUserMessages(selectedClient.Username);
+                // Seçilen clientın usernameine göre o clientla olan mesajlaşmaları filtreleyerek SelectedUserMessages listesine atar..
+                FilterUserMessages(selectedClient.Username, false);
+                await InvokeAsync(StateHasChanged); // UI güncellemesi..
+            }
+            else if (!string.IsNullOrEmpty(groupName))// Grup ile mesajlaşıyorsa..
+            {
+                // Clientın grupla mesajlaşmaları Messages listesine ekleniyor..
+                Messages.Add(new ClientMessage() { ReceiverClientUsernameOrGroupName = groupName, SenderClientUsername = senderClient.Username, Message = message, IsGroupMessage = true, IsSenderReceiver = (senderClient.Username == CallerUsername) ? true : false });
 
-            await InvokeAsync(StateHasChanged); // UI güncellemesi..
+                // Seçilen grubun adına göre gruptaki mesajlaşmaları filtreleyerek SelectedUserMessages listesine atar..
+                FilterUserMessages(groupName, true);
+                await InvokeAsync(StateHasChanged); // UI güncellemesi..
+            }
         });
 
         await hubConnection.StartAsync(); // Hub bağlantısını başlatır..
@@ -328,9 +347,24 @@ else
     List<ClientMessage> SelectedUserMessages = new List<ClientMessage>(); // Seçilen clientla ve callerla alakalı mesajları tutacak olan liste..
 
     // Messsages listesinden parametrede gelen clientın attığı ve o usernamee atılan mesajları filtreler..
-    void FilterUserMessages(string receiverClientName)
+    void FilterUserMessages(string receiverClientNameOrGroupName, bool IsGroupMessage)
     {
-        SelectedUserMessages = Messages.Where(msg => msg.ReceiverClientUsername == receiverClientName || msg.SenderClientUsername == receiverClientName).ToList();
+        if (IsGroupMessage)
+        {
+            // Eğer selectedGroup null değilse ve seçili olan grubun adı parametredeki değere eşitse filtreleme yapacak..
+            if (selectedGroup.GroupName == null ? false : selectedGroup.GroupName.Equals(receiverClientNameOrGroupName) ? true : false)
+            {
+                SelectedUserMessages = Messages.Where(msg => (msg.ReceiverClientUsernameOrGroupName == receiverClientNameOrGroupName || msg.SenderClientUsername == receiverClientNameOrGroupName) && msg.IsGroupMessage).ToList();
+            }
+        }
+        else
+        {
+            // Eğer kullanıcı bir userı seçmişse yani selectedClient değeri null değilse ve parametredeki değer ile aynıysa filtreleme yapacak..
+            if (selectedClient.Username == null ? false : selectedClient.Username.Equals(receiverClientNameOrGroupName) ? true : false)
+            {
+                SelectedUserMessages = Messages.Where(msg => (msg.ReceiverClientUsernameOrGroupName == receiverClientNameOrGroupName || msg.SenderClientUsername == receiverClientNameOrGroupName) && !msg.IsGroupMessage).ToList();
+            }
+        }
     }
 
     private Client selectedClient = new Client();
@@ -338,9 +372,9 @@ else
     {
         // Mesaj gönderilecek client bilgisi selectedClienta atanıyor..
         selectedClient = client;
-
+        selectedGroup = new Group();
         // Seçilen clientın usernameine göre o clientla olan mesajlaşmaları filtreleyerek SelectedUserMessages listesine atar..
-        FilterUserMessages(client.Username);
+        FilterUserMessages(client.Username, false);
     }
 
     private Group selectedGroup = new Group();
@@ -348,30 +382,43 @@ else
     {
         // Mesaj gönderilecek grup bilgisi selectedGroupa atanıyor..
         selectedGroup = group;
+        selectedClient = new Client();
         await AddClientToGroup(selectedGroup.GroupName);
 
         await GetClientsOfGroup(selectedGroup.GroupName);
 
         // Seçilen grubun GroupNameine göre o grupla olan mesajlaşmaları filtreleyerek SelectedUserMessages listesine atar..
-        FilterUserMessages(group.GroupName);
+        FilterUserMessages(group.GroupName, true);
     }
 
     // Caller bir clienta ya da tüm clientlara mesaj gönderecekse serverı tetikler..
-    async Task SendMessageAsync(string message)
+    async Task SendMessageAsync(string message, string? groupName)
     {
         // Mesaj yazmadan butona tıklanırsa kodlar çalışmayacak..
         if (!string.IsNullOrEmpty(message))
         {
-            // Serverdaki SendMessageAsync methodu tetiklenerek seçilen clienta mesajın gönderilme işlemi gerçekleştiriliyor..
-            await hubConnection.SendAsync("SendMessageAsync", message, selectedClient);
+            // Grup adı varsa ilgili gruba mesaj gönderilecek..
+            if (!string.IsNullOrEmpty(groupName))
+            {
+                // Serverdaki SendMessageAsync methodu tetiklenerek seçilen gruba mesajın gönderilme işlemi gerçekleştiriliyor..
+                await hubConnection.SendAsync("SendMessageToGroupAsync", groupName, message);
 
-            // Mesajı gönderen clientta da göstermek için mesaj Messages listesine ekleniyor..
-            Messages.Add(new ClientMessage() { Message = message, ReceiverClientUsername = selectedClient.Username, SenderClientUsername = CallerUsername, IsSenderReceiver = true });
+                // Seçilen grubun adına göre o gruptaki mesajlaşmaları filtreleyerek SelectedUserMessages listesine atar..
+                FilterUserMessages(groupName, true);
+                StateHasChanged();
+            }
+            else
+            {
+                // Serverdaki SendMessageAsync methodu tetiklenerek seçilen clienta mesajın gönderilme işlemi gerçekleştiriliyor..
+                await hubConnection.SendAsync("SendMessageAsync", message, selectedClient);
 
-            // Seçilen clientın usernameine göre o clientla olan mesajlaşmaları filtreleyerek SelectedUserMessages listesine atar..
-            FilterUserMessages(selectedClient.Username);
-            StateHasChanged();
+                // Mesajı gönderen clientta da göstermek için mesaj Messages listesine ekleniyor..
+                Messages.Add(new ClientMessage() { Message = message, ReceiverClientUsernameOrGroupName = selectedClient.Username, SenderClientUsername = CallerUsername, IsSenderReceiver = true });
 
+                // Seçilen clientın usernameine göre o clientla olan mesajlaşmaları filtreleyerek SelectedUserMessages listesine atar..
+                FilterUserMessages(selectedClient.Username, false);
+                StateHasChanged();
+            }
             // Mesaj temizleniyor..
             TextMessage = string.Empty;
         }
@@ -410,7 +457,7 @@ else
     {
         if (e.Key == "Enter")
         {
-            await SendMessageAsync(TextMessage);
+            await SendMessageAsync(TextMessage, selectedGroup.GroupName);
         }
     }
 
