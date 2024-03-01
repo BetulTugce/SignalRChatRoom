@@ -26,7 +26,7 @@ The server application is built with ASP.NET Core using .NET 8, while the client
     cd SignalRChatRoom
     ```
 
-6. **Run the project:**
+3. **Run the project:**
 
    Right-click on the solution and select `Configure Startup Projects`. In the opened window, select `Multiple startup projects`, mark SignalRChatRoom.Client and SignalRChatRoom.Server projects as `Start`, then click `OK` and press `F5` to run the project.
 
