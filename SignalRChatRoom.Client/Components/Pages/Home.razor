@@ -381,6 +381,13 @@ else
         Client client = Clients.FirstOrDefault(c => c.Username == username);
         return (client != null) ? false : true;
     }
+    
+    // Girilen groupName varolan gruplardan biri tarafından kullanılıyorsa false, kullanılmıyorsa true döndürecek..
+    public async Task<bool> CheckGroupNameAsync(string groupName)
+    {
+        Group group = Groups.FirstOrDefault(g => g.GroupName == groupName);
+        return (group != null) ? false : true;
+    }
 
     List<ToastMessage> AuthenticationMessages = new List<ToastMessage>();
 
@@ -500,11 +507,25 @@ else
         // Grup adı yazmadan butona tıklanırsa kodlar çalışmayacak..
         if (!string.IsNullOrEmpty(groupNameText))
         {
-            // Serverdaki AddGroupAsync methodu tetiklenerek grup oluşturma işlemi gerçekleştiriliyor..
-            await hubConnection.SendAsync("AddGroupAsync", groupNameText);
+            bool result = await CheckGroupNameAsync(groupNameText);
+            if (result) // Oda adı kullanılabilirse..
+            {
+                // Serverdaki AddGroupAsync methodu tetiklenerek grup oluşturma işlemi gerçekleştiriliyor..
+                await hubConnection.SendAsync("AddGroupAsync", groupNameText);
 
-            // Grup oluşturma inputu temizleniyor..
-            groupNameText = string.Empty;
+                // Grup oluşturma inputu temizleniyor..
+                groupNameText = string.Empty;
+            }else
+            {
+                // Usernamein kullanımda olduğuna dair uyarı verilecek..
+                NotificationMessages.Add(new ToastMessage()
+                {
+                        Type = ToastType.Warning,
+                        Title = "İşlem Başarısız",
+                        HelpText = $"{DateTime.Now}",
+                        Message = $"Bu isimde bir oda zaten var!",
+                });
+            }
         }
     }
 
