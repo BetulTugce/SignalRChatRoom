@@ -13,6 +13,10 @@
         padding: 0;
     } */
 
+    main{
+        overflow-x: auto;
+    }
+
     .container {
         display: inline-flex;
     }
@@ -58,6 +62,7 @@
         padding: 20px;
         border: 1px solid #e0e0e0;
         box-sizing: border-box;
+        min-width: 400px;
     }
 
         .conversation .header {
@@ -132,17 +137,26 @@
 
     .addGroup {
         margin-top: 10px;
-        background-color: #e0e0e0;
-        border: none;
-        border-radius: 0 5px 5px 0;
+        /* background-color: #e0e0e0; */
+        /* border: none; */
+        /* border-radius: 0 5px 5px 0; */
     }
 </style>
 @if (!IsAuthenticate)
 {
     <Toasts class="p-3" Messages="AuthenticationMessages" AutoHide="true" StackLength="3" Placement="ToastsPlacement.TopRight" />
 
-    <InputText @bind-Value="CallerUsername" Label="Kullanıcı adı"></InputText>
-    <button @onclick=SignIn>Giriş Yap</button>
+    <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+        <Card Color="CardColor.Light" Class="mb-4" Style="width:18rem;">
+            <CardHeader>Chat Room</CardHeader>
+            <CardBody>
+                <CardTitle>Giriş Yap</CardTitle>
+                    <InputText style="padding: 10px 10px 10px 5px; display: block; width: 300px; border: none; border-bottom: 1px solid #757575;" @bind-Value="CallerUsername" placeholder="Kullanıcı Adı"></InputText>
+                @* <button @onclick=SignIn>Giriş Yap</button> *@
+                <Button class="addGroup" Color="ButtonColor.Primary" @onclick=SignIn> Giriş Yap </Button>
+            </CardBody>
+        </Card>
+    </div>
 }
 else
 {
@@ -156,19 +170,22 @@ else
             @* Sistemdeki odalar/gruplar listeleniyor.. *@
             <div class="users">
                 <div>
-                    <input type="text" @bind-value="GroupNameText" placeholder="Grup Adı">
-                    <button class="addGroup" @onclick=@(() => AddGroup(GroupNameText))>Grup Ekle</button>
+                <input style="padding: 10px 10px 10px 5px; display: block; width: 300px; border: none; border-bottom: 1px solid #757575;" type="text" @bind-value="GroupNameText" placeholder="Oda Adı">
+                    <Button class="addGroup" Color="ButtonColor.Primary" @onclick=@(() => AddGroup(GroupNameText))> Oda Ekle </Button>
+                    @* <button class="addGroup" @onclick=@(() => AddGroup(GroupNameText))>Grup Ekle</button> *@
                 </div>
                 <h3>Odalar</h3>
                 <ul>
                     @foreach (var group in Groups)
                     {
-                        <li class="user @(group == selectedGroup ? "active" : "")" @onclick="@(() => SelectGroup(group))">@group.GroupName</li>
+                        <Tooltip Class="me-4" Title="Odaya girmek ve üyeleri görüntülemek için tıkla." Placement="TooltipPlacement.Right">
+                            <li class="user @(group == selectedGroup ? "active" : "")" @onclick="@(() => SelectGroup(group))">@group.GroupName</li>
+                        </Tooltip>
                     }
                 </ul>
             </div>
             @* Seçili oda/gruba dahil olan clientlar listeleniyor.. *@
-            <div class="users">
+            <div class="users" style="display: @displayStyle">
                 @if (!string.IsNullOrEmpty(selectedGroup.GroupName))
                 {
                     <h3>@selectedGroup.GroupName Üyeleri </h3>
@@ -229,6 +246,7 @@ else
 }
 
 @code {
+    private string displayStyle = "none"; // clientsOfGroupu listeleyen alanın görünürlüğü başlangıç için gizleniyor..
     List<ToastMessage> NotificationMessages = new List<ToastMessage>();
 
     List<ClientMessage> Messages = new List<ClientMessage>(); // Clientla alakalı mesajları tutacak olan liste..
@@ -436,6 +454,8 @@ else
         await AddClientToGroup(selectedGroup.GroupName);
 
         await GetClientsOfGroup(selectedGroup.GroupName);
+
+        displayStyle = displayStyle == "none" ? "block" : "none"; // Bir gruba/odaya ait clientları listeleyen alanın görünürlüğünü değiştirir..
 
         // Seçilen grubun GroupNameine göre o grupla olan mesajlaşmaları filtreleyerek SelectedUserMessages listesine atar..
         FilterUserMessages(group.GroupName, true);

@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.8.34511.84
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SignalRChatRoom.Server", "SignalRChatRoom.Server\SignalRChatRoom.Server.csproj", "{1F4A9C28-52BC-46DB-AF2D-04BE5FE9E8FE}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SignalRChatRoom.Server", "SignalRChatRoom.Server\SignalRChatRoom.Server.csproj", "{1F4A9C28-52BC-46DB-AF2D-04BE5FE9E8FE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SignalRChatRoom.Client", "SignalRChatRoom.Client\SignalRChatRoom.Client.csproj", "{903C3E14-A63B-4A85-8BD7-2205AA81A9A1}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SignalRChatRoom.Client", "SignalRChatRoom.Client\SignalRChatRoom.Client.csproj", "{903C3E14-A63B-4A85-8BD7-2205AA81A9A1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
