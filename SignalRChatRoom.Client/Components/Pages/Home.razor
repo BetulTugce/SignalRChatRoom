@@ -440,6 +440,16 @@ else
                 SelectedUserMessages = Messages.Where(msg => (msg.ReceiverClientUsernameOrGroupName == receiverClientNameOrGroupName || msg.SenderClientUsername == receiverClientNameOrGroupName) && !msg.IsGroupMessage).ToList();
             }
         }
+
+        #region Filtreleme için alternatif kod
+        // // Mesajları filtrelemek için kullanılacak koşulları önceden belirliyorum..
+        // Func<ClientMessage, bool> filterCondition = msg =>
+        //     (IsGroupMessage && msg.IsGroupMessage && msg.ReceiverClientUsernameOrGroupName == receiverClientNameOrGroupName) ||
+        //     (!IsGroupMessage && !msg.IsGroupMessage && (msg.ReceiverClientUsernameOrGroupName == receiverClientNameOrGroupName || msg.SenderClientUsername == receiverClientNameOrGroupName));
+
+        // // Gelen mesajlar bu filtreye göre filtreleniyor
+        // SelectedUserMessages = Messages.Where(filterCondition).ToList();
+        #endregion
     }
 
     private Client selectedClient = new Client();

@@ -8,6 +8,10 @@ This project is a simple chat application built using ASP.NET Core SignalR and B
 
 When the application starts, users can join chat rooms by selecting a username on the main page. They can then join different rooms and chat with other users.
 
+## Screen Recordings
+
+https://github.com/BetulTugce/SignalRChatRoom/assets/79140478/884fcdfc-5ccf-4e08-ad04-603488999dcf
+
 ## Technological Infrastructure
 
 The server application is built with ASP.NET Core using .NET 8, while the client application is developed using Blazor Web App also with .NET 8. This application was developed for the purpose of learning SignalR. SignalR is an open-source library that enables real-time functionality in web applications using WebSocket technology. Data is stored in memory, but you have the option to enhance the project by adding support for a database and incorporating various functionalities. If you wish to move communication with clients outside of the hub, you can utilize the [IHubContext](https://learn.microsoft.com/en-us/aspnet/core/signalr/hubcontext?view=aspnetcore-8.0) interface. Essentially, this interface allows us to use the SignalR architecture outside of 'Hub' classes, thereby enabling interaction between clients and servers from different places such as controllers, classes, etc.
